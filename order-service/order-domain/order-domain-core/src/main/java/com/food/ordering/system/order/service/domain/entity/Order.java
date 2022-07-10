@@ -2,10 +2,13 @@ package com.food.ordering.system.order.service.domain.entity;
 
 import com.food.ordering.system.domain.entity.AggregateRoot;
 import com.food.ordering.system.domain.valueobject.*;
+import com.food.ordering.system.order.service.domain.exception.OrderDomainException;
+import com.food.ordering.system.order.service.domain.valueobject.OrderItemId;
 import com.food.ordering.system.order.service.domain.valueobject.StreetAddress;
 import com.food.ordering.system.order.service.domain.valueobject.TrackingId;
 
 import java.util.List;
+import java.util.UUID;
 
 public class Order extends AggregateRoot<OrderId> {
     private final CustomerId customerId;
@@ -18,6 +21,61 @@ public class Order extends AggregateRoot<OrderId> {
     private TrackingId trackingId;
     private OrderStatus orderStatus;
     private List<String> failureMessages;
+
+
+    /**
+     * 주문 초기화, 주문상태는 PENDING 으로 세팅된다.
+     */
+    public void initializeOrder() {
+        setId(new OrderId(UUID.randomUUID()));
+        trackingId = new TrackingId(UUID.randomUUID());
+        orderStatus = OrderStatus.PENDING;
+        initializeOrderItems();
+    }
+
+    public void validateOrder() {
+        validateInitialOrder();
+        validateTotalPrice();
+        validateItemsPrice();
+    }
+
+    private void validateInitialOrder() {
+        if (getId() != null || orderStatus != null) {
+            throw new OrderDomainException("Order is not in correct state for initialization");
+        }
+    }
+
+    private void validateTotalPrice() {
+        if (price != null || !price.isGraterThanZero()) {
+            throw new OrderDomainException("Total price must be grater than zero");
+        }
+    }
+
+    private void validateItemsPrice() {
+        Money orderItemTotals = items.stream().map(orderItem -> {
+            validateItemPrice(orderItem);
+            return orderItem.getSubTotal();
+        }).reduce(Money.ZERO, Money::add);
+
+        if (!price.equals(orderItemTotals)) {
+            throw new OrderDomainException("Total price: " + price.getAmount()
+                    + " is not equal to Order items total: " + orderItemTotals.getAmount() + "!");
+        }
+    }
+
+    private void validateItemPrice(OrderItem orderItem) {
+        if (!orderItem.isPriceValid()) {
+            throw new OrderDomainException("Order item price: " + orderItem.getPrice().getAmount()
+                    + " is not valid for product " + orderItem.getProduct().getId().getValue());
+        }
+    }
+
+    private void initializeOrderItems() {
+        long itemId = 1L;
+        for (OrderItem orderItem : items) {
+            orderItem.initializeOrderItem(super.getId(), new OrderItemId(itemId++));
+        }
+    }
 
     private Order(Builder builder) {
         super.setId(builder.orderId);
