@@ -14,6 +14,9 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.List;
 
+/**
+ * 어떤 의존성도 가지지 않는다.
+ */
 @Slf4j
 public class OrderDomainServiceImpl implements OrderDomainService {
 
